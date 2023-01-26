@@ -24,9 +24,9 @@ class AccountCreate(BaseModel):
 class AccountResponse(BaseModel):
     account_name: str
     account_number: int
-    bitcoin_balance: int
-    naira_balance: int 
-    id: int
+    bitcoin_balance: float
+    naira_balance: float 
+    _id: str
     class Config:
         orm_mode = True 
         
@@ -45,4 +45,4 @@ class Transaction(BaseModel):
     amount: float
     
 class Transfer(Transaction):
-    sender_account_number: int
+    recipient_account_number: int

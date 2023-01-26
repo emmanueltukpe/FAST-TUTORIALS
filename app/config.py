@@ -1,11 +1,10 @@
 from pydantic import BaseSettings
 
 class Settings(BaseSettings):
-    database_hostname: str
-    database_port: int
-    database_username: str
-    database_password: str
-    database_name: str
+    mongo_uri: str
+    database: str
+    account_collection: str
+    transaction_collection: str
     secret_key: str
     algorithm: str
     expires: int

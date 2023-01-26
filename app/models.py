@@ -1,35 +1,87 @@
-from app.db import Base
-from sqlalchemy import Column, Integer, String, Boolean, Float
-from sqlalchemy.sql.sqltypes import TIMESTAMP
-from sqlalchemy.sql.expression import text
-from enum import Enum
-# from sqlalchemy.orm import relationship
+from app.schemas import AccountCreate, Transaction, Transfer
+from app.utils import get_uuid, generate_unique_number, hash, TransactionsMethods
+from app.db import account_collection, transaction_collection
 
 
-class User(Base):
-    __tablename__ = 'users'
-    id = Column(Integer, primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    email = Column(String(255), nullable=False)
-    is_loved = Column(Boolean, server_default="FALSE")
-    time = Column(TIMESTAMP(timezone=True), nullable=False,
-                  server_default=text('now()'))
+class AccountsRepo:
+    @staticmethod
+    def create_account(account: AccountCreate):
+        hashed = hash(account.password)
+        account.password = hashed
+        document = account.dict()
+        document["account_number"] = generate_unique_number()
+        document["naira_balance"] = 0.0
+        document["bitcoin_balance"] = 0.0
+        document["_id"] = get_uuid()
+        res = account_collection.insert_one(document)
+        assert res.acknowledged
 
-class Account(Base):
-    __tablename__ = 'accounts'
-    id = Column(Integer, primary_key=True, nullable=False)
-    account_number = Column(Integer, nullable=False, unique=True)
-    account_name = Column(String(255), nullable=False)
-    password = Column(String(255), nullable=False)
-    naira_balance = Column(Float, nullable=False, server_default="0")
-    bitcoin_balance = Column(Float, nullable=False, server_default="0")
+        return account_collection.find_one({"_id": res.inserted_id})
 
-class Transaction(Base):
-    __tablename__ = 'transactions'
-    id = Column(Integer, primary_key=True, nullable=False)
-    sender_account_number = Column(String, nullable=True)
-    recipient_account_number = Column(String, nullable=True)
-    amount = Column(Float, nullable=False)
-    transaction_type = Column(String, nullable=False)
-    # account_id = Column(Intteger, Foreign_key("accounts.id", ondelete="CASCADE"), nullable=False)
-    # account = relationship("Account")
+
+class TransactionsRepo:
+    @staticmethod
+    def credit(transaction: Transaction, account_number: int):
+        amount = transaction.amount
+        TransactionsMethods.credit(account_number, amount)
+        document = transaction.dict()
+        document["recipient_account_number"] = account_number
+        document["transaction_type"] = "Credit"
+        document["_id"] = get_uuid()
+        res = transaction_collection.insert_one(document)
+        assert res.acknowledged
+
+        return transaction_collection.find_one({"_id": res.inserted_id})
+
+    @staticmethod
+    def debit(transaction: Transaction, account_number: int):
+        amount = transaction.amount
+        TransactionsMethods.debit(account_number, amount)
+        document = transaction.dict()
+        document["sender_account_number"] = account_number
+        document["transaction_type"] = "Debit"
+        document["_id"] = get_uuid()
+        res = transaction_collection.insert_one(document)
+        assert res.acknowledged
+
+        return transaction_collection.find_one({"_id": res.inserted_id})
+
+    @staticmethod
+    def naria_bitcoin_converter(transaction: Transaction, account_number: int):
+        amount = transaction.amount
+        TransactionsMethods.convert_N_btc(account_number, amount)
+        document = transaction.dict()
+        document["recipient_account_number"] = account_number
+        document["transaction_type"] = "Conversion"
+        document["_id"] = get_uuid()
+        res = transaction_collection.insert_one(document)
+        assert res.acknowledged
+
+        return transaction_collection.find_one({"_id": res.inserted_id})
+
+    @staticmethod
+    def bitcoin_naira_converter(transaction: Transaction, account_number: int):
+        amount = transaction.amount
+        TransactionsMethods.convert_btc_N(account_number, amount)
+        document = transaction.dict()
+        document["recipient_account_number"] = account_number
+        document["transaction_type"] = "Conversion"
+        document["_id"] = get_uuid()
+        res = transaction_collection.insert_one(document)
+        assert res.acknowledged
+
+        return transaction_collection.find_one({"_id": res.inserted_id})
+
+    @staticmethod
+    def transfer(transfer: Transfer, account_number: int):
+        amount = transfer.amount
+        TransactionsMethods.transfer(
+            account_number, transfer.recipient_account_number, amount)
+        document = transfer.dict()
+        document["sender_account_number"] = account_number
+        document["transaction_type"] = "Transfer"
+        document["_id"] = get_uuid()
+        res = transaction_collection.insert_one(document)
+        assert res.acknowledged
+
+        return transaction_collection.find_one({"_id": res.inserted_id})

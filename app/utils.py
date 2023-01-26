@@ -1,11 +1,10 @@
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, status
 from passlib.context import CryptContext
 from random import randint
-from app.db import get_db
-from sqlalchemy.orm import Session
-import app.models as models
+from app.db import account_collection
 import requests
 from app.config import settings
+from uuid import uuid4
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -41,81 +40,81 @@ def convert_naira_to_btc(naira_amount: float):
     return btc_amount
 
 
-def get_account(account_number: int, db: Session):
-    account = db.query(models.Account).filter(
-        models.Account.account_number == account_number)
-    print(account)
-    if account.first() is None:
+def get_account(account_number: int):
+    account  = account_collection.find_one({"account_number": account_number})
+    if account is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return account
 
 
-def debit(account_number: int, amount: float, db: Session):
-    account = get_account(account_number, db)
-    account_balance = account.first().naira_balance
-    if account_balance < amount:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient Funds")
-    new_bal = account_balance - amount
-    account.update({models.Account.naira_balance: new_bal},
-                   synchronize_session=False)
-    db.commit()
-    return account.first()
-
-
-def credit(account_number: int, amount: float, db: Session):
-    account = get_account(account_number, db)
-    account_balance = account.first().naira_balance
-    new_bal = account_balance + amount
-    account.update({models.Account.naira_balance: new_bal},
-                   synchronize_session=False)
-    db.commit()
-    return account.first()
-
-
-def convert_btc_N(account_number: int, amount: float, db: Session):
-    account = get_account(account_number, db)
-    btc_balance = account.first().bitcoin_balance
-    if btc_balance < amount:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have sufficient coins for this operation")
-    new_bal_btc = btc_balance - amount
-    converted = convert_btc_to_naira(amount)
-    new_bal = account.first().naira_balance + converted
-    account.update({models.Account.naira_balance: new_bal,
-                   models.Account.bitcoin_balance: new_bal_btc}, synchronize_session=False)
-    db.commit()
-    return account.first()
-
-
-def convert_N_btc(account_number: int, amount: float, db: Session):
-    account = get_account(account_number, db)
-    naira_balance = account.first().naira_balance
-    if naira_balance < amount:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have sufficient money for this operation")
-    new_bal_naira = naira_balance - amount
-    converted = convert_naira_to_btc(amount)
-    new_bal = account.first().bitcoin_balance + converted
-    account.update({models.Account.bitcoin_balance: new_bal,
-                   models.Account.naira_balance: new_bal_naira}, synchronize_session=False)
-    db.commit()
-    return account.first()
-
-def transfer(account_number: int, sender_account: int, amount: float, db: Session):
-    account = get_account(account_number, db)
-    btc_balance = account.first().bitcoin_balance
-    if btc_balance < amount:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have sufficient coins for this operation")
-    sender = get_account(sender_account, db)
-    res_new_balance = btc_balance - amount
-    sender_bal = sender.first().bitcoin_balance
-    new_sender_bal  = sender_bal + amount
-    account.update({models.Account.bitcoin_balance: res_new_balance}, synchronize_session=False)
-    db.commit()
-    sender.update({models.Account.bitcoin_balance: new_sender_bal}, synchronize_session=False)
-    db.commit()
-    return account.first()
+class TransactionsMethods:
     
+    def debit(account_number: int, amount: float):
+        account = get_account(account_number)
+        account_balance = account["naira_balance"]
+        if account_balance < amount:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient Funds")
+        new_bal = account_balance - amount
+        update =account_collection.find_one_and_update({"account_number": account_number},
+                    {"$set": {"naira_balance": new_bal}})
+        return update
+
+    def credit(account_number: int, amount: float):
+        account = get_account(account_number)
+        account_balance = account["naira_balance"]
+        new_bal = account_balance + amount
+        update =account_collection.find_one_and_update({"account_number": account_number},
+                    {"$set": {"naira_balance": new_bal}})
+        return update
+
+
+    def convert_btc_N(account_number: int, amount: float):
+        account = get_account(account_number)
+        btc_balance = account["bitcoin_balance"]
+        if btc_balance < amount:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="You do not have sufficient coins for this operation")
+        new_bal_btc = btc_balance - amount
+        converted = convert_btc_to_naira(amount)
+        new_bal = account["naira_balance"] + converted
+        update =account_collection.find_one_and_update({"account_number": account_number},
+                    {"$set": {"naira_balance": new_bal, "bitcoin_balance": new_bal_btc}})
+        return update
+
+
+    def convert_N_btc(account_number: int, amount: float):
+        account = get_account(account_number)
+        naira_balance = account["naira_balance"]
+        if naira_balance < amount:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="You do not have sufficient money for this operation")
+        new_bal_naira = naira_balance - amount
+        converted = convert_naira_to_btc(amount)
+        new_bal = account["bitcoin_balance"] + converted
+        update =account_collection.find_one_and_update({"account_number": account_number},
+                    {"$set": {"naira_balance": new_bal_naira, "bitcoin_balance": new_bal}})
+        return update
+
+
+    def transfer(account_number: int, recipient_account: int, amount: float):
+        account = get_account(account_number)
+        btc_balance = account["bitcoin_balance"]
+        if btc_balance < amount:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="You do not have sufficient coins for this operation")
+        recipient = get_account(recipient_account)
+        res_new_balance = btc_balance - amount
+        recipient_bal = recipient["bitcoin_balance"]
+        new_recipient_bal  = recipient_bal + amount
+        account_collection.find_one_and_update({"account_number": account_number},
+                    {"$set": {"bitcoin_balance": res_new_balance}})
+        account_collection.find_one_and_update({"account_number": recipient_account},
+                    {"$set": {"bitcoin_balance": new_recipient_bal}})
+        return "success"
+
+
+def get_uuid() -> str:
+    """Returns an unique UUID (UUID4)"""
+    return str(uuid4())
