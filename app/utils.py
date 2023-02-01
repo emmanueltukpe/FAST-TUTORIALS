@@ -65,8 +65,10 @@ class TransactionsMethods:
         account = get_account(account_number)
         account_balance = account["naira_balance"]
         new_bal = account_balance + amount
+        print(new_bal)
         update =account_collection.find_one_and_update({"account_number": account_number},
                     {"$set": {"naira_balance": new_bal}})
+        print(update)
         return update
 
 
