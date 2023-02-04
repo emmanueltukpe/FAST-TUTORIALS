@@ -43,6 +43,25 @@ class TokenData(BaseModel):
 
 class Transaction(BaseModel):
     amount: float
+
+class FundResponse(Transaction):
+    recipient_account_number: int  
+    transaction_type: str
+    _id: str
+    class Config:
+        orm_mode = True 
+    
+class WithdrawalResponse(Transaction):
+    sender_account_number: int  
+    transaction_type: str
+    _id: str
+    class Config:
+        orm_mode = True 
     
 class Transfer(Transaction):
     recipient_account_number: int
+
+class TransferResponse(WithdrawalResponse):
+    recipient_account_number: int
+    class Config:
+        orm_mode = True 

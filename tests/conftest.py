@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.oauth2 import create_jwt
-from app.db import account_collection
+from app.db import account_collection, transaction_collection
 
 
 client = TestClient(app)
@@ -25,13 +25,11 @@ def test_account(client):
     new_user['password'] = data['password']
     return new_user
 
-
-
 @pytest.fixture()
-def test_account_with_money(client):
+def test_alt_account(client):
     data = {
-        "account_name": "Chidex",
-        "password": "shehasmoney"
+        "account_name": "Chidalu",
+        "password": "otugbokindi"
     }
     res = client.post("/accounts/", json=data)
     assert res.status_code == 201
@@ -42,8 +40,8 @@ def test_account_with_money(client):
 
 
 @pytest.fixture
-def token(test_account_with_money):
-    return create_jwt({"account_number": test_account_with_money["account_number"]})
+def token(test_account):
+    return create_jwt({"account_number": test_account["account_number"]})
 
 
 @pytest.fixture
@@ -54,8 +52,15 @@ def verified_client(client, token):
     }
     return client
 
+
 @pytest.fixture
-def clear_db(test_account):
-    yield account_collection.delete_many({"account_name": test_account["account_name"]})
-    # yield account_collection.delete_many({"account_name": test_account_with_money["account_name"]})
+def clear_db(test_account, test_alt_account):
+    account_collection.delete_many(
+        {"account_name": test_account["account_name"]})
+    account_collection.delete_many(
+        {"account_name": test_alt_account["account_name"]})
+    transaction_collection.delete_many({"sender_account_number": test_account["account_number"]})
+    transaction_collection.delete_many({"recipient_account_number": test_account["account_number"]})
+    transaction_collection.delete_many({"recipient_account_number": test_alt_account["account_number"]})
     
+    return "done"

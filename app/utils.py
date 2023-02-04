@@ -14,8 +14,6 @@ def hash(password: str):
     return pwd_context.hash(password)
 
 
-def generate_unique_number():
-    return randint(100000000, 999999999)
 
 
 def verify(given_password: str, hashed_password: str):
@@ -47,6 +45,13 @@ def get_account(account_number: int):
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return account
 
+def generate_unique_number():
+    number =  randint(100000000, 999999999)
+    account  = account_collection.find_one({"account_number": number})
+    if account is not None:
+        return generate_unique_number()
+    else:
+        return number
 
 class TransactionsMethods:
     
@@ -65,10 +70,8 @@ class TransactionsMethods:
         account = get_account(account_number)
         account_balance = account["naira_balance"]
         new_bal = account_balance + amount
-        print(new_bal)
         update =account_collection.find_one_and_update({"account_number": account_number},
                     {"$set": {"naira_balance": new_bal}})
-        print(update)
         return update
 
 
