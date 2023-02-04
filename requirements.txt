@@ -1,4 +1,5 @@
 anyio==3.6.2
+attrs==22.2.0
 autopep8==2.0.1
 bcrypt==4.0.1
 certifi==2022.12.7
@@ -16,11 +17,14 @@ httpcore==0.16.3
 httptools==0.5.0
 httpx==0.23.3
 idna==3.4
+iniconfig==2.0.0
 itsdangerous==2.1.2
 Jinja2==3.1.2
 MarkupSafe==2.1.1
 orjson==3.8.3
+packaging==23.0
 passlib==1.7.4
+pluggy==1.0.0
 psycopg==3.1.7
 psycopg2==2.9.5
 pyasn1==0.4.8
@@ -28,6 +32,7 @@ pycodestyle==2.10.0
 pycparser==2.21
 pydantic==1.10.4
 pymongo==4.3.3
+pytest==7.2.1
 python-dotenv==0.21.0
 python-jose==3.3.0
 python-multipart==0.0.5
